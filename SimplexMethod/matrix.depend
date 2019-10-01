@@ -1,0 +1,15 @@
+# depslib dependency file v1.0
+1526882607 source:e:\1我爱学习\presentation&classwork\运筹学\matrix\main.cpp
+	<stdio.h>
+	<iostream>
+	"_Matrix.h"
+	"BFSsearching.h"
+
+1526825188 e:\1我爱学习\presentation&classwork\运筹学\matrix\_matrix.h
+	<stdio.h>
+	<stdlib.h>
+
+1526882677 e:\1我爱学习\presentation&classwork\运筹学\matrix\bfssearching.h
+	"_Matrix.h"
+	<iostream>
+

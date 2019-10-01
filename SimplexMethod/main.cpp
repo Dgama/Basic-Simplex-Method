@@ -1,0 +1,253 @@
+#include <stdio.h>
+#include <iostream>
+#include "_Matrix.h"
+#include"BFSsearching.h"
+
+//带速度变量卡尔曼滤波
+using namespace std;
+
+//打印2维矩阵
+
+
+int main()
+{
+    //输入原始LP
+    int type;
+    cout<<"请输入max（1），还是min（-1）：";
+    cin>>type;//用于把min变成max
+    int m,n;
+    cout<<"情输入constrain数目，总变量数目：";
+    cin>>m;cin>>n;
+    _Matrix ori(m,n),oriC(1,n),b(m,1);
+    int *p=new int[m];
+    cout<<"请按顺序输入obj中变量的系数(空格分开，包括限制条件里出现的所有变量，如果obj中不出现，以0代替)：";
+
+    int j;
+    for(int i=0;i<n;++i){
+        cin>>j;
+        oriC.write(0,i,type*j);
+    }
+
+    int c;
+    int num=1;
+    for(int i=0;i<m;++i){
+        cout<<"请输入第"<<i<<"个限制条件(变量只用系数代替,以)";
+        for(int j=0;j<n;++j){
+            cin>>c;
+            ori.write(i,j,c);
+        }
+    }
+    cout<<"请输入每一个限制条件的b：";
+    for(int i=0;i<m;++i){
+        cin>>c;
+        b.write(i,0,c);
+    }
+    cout<<"请输入每一个限制条件的>(-1)=(0)<(1):";
+    for(int i=0;i<m;++i){
+        cin>>c;
+        p[i]=c;
+    }
+
+
+    //求标准形式
+    //利用p[]保存的信息确定需添加的变量个数
+    num=0;
+    for(int i=0;i<m;++i){
+        if(p[i]!=0) ++num;
+    }
+    num+=n;//StandardForm矩阵的变量总数
+
+
+    _Matrix Standard(m,num),StandardC(1,num);
+
+    //拷贝ori矩阵的内容
+    for(int i=0;i<m;++i){
+        for(int j=0;j<n;++j){
+            Standard.write(i,j,ori.read(i,j));
+        }
+    }
+
+    //拷贝oriC矩阵的内容
+    for(int j=0;j<num;++j){
+            if(j<n)StandardC.write(0,j,oriC.read(0,j));
+            else StandardC.write(0,j,0);
+        }
+
+
+    //添加松弛变量使oriC化为标准形式。
+    int k=0;
+    for(int i=0;i<m;++i){
+        if(p[i]>0){//大于零则在第i行加上系数-1
+            Standard.write(i,n+k,1);
+            for(int j=n;j<num;++j){
+                if(j==(n+k)) continue;
+                Standard.write(i,j,0);
+            }
+            ++k;
+        }
+        if(p[i]<0){//小于零则在第i行加上系数1
+            Standard.write(i,n+k,-1);
+            for(int j=n;j<num;++j){
+                if(j==(n+k))continue;
+                Standard.write(i,j,0);
+            }
+            ++k;
+        }
+        if(p[i]==0){//等于零则在不需要加上人工变量
+            for(int j=n;j<num;++j){
+                Standard.write(i,j,0);
+            }
+        }
+    }
+    delete[]p;
+
+
+
+    //利用TwoPhase Method求Start Basis
+    _Matrix Twophase(m,num+m),TwophaseC(1,num+m),TwophaseCB(1,m),TwophaseCT(1,num);
+    for(int i=0;i<m;++i){
+        TwophaseCB.write(0,i,-1);
+    }
+    for(int i=0;i<num;++i){
+        TwophaseCT.write(0,i,0);
+    }
+    for(int j=0;j<num;++j){
+            if(j<num)TwophaseC.write(0,j,StandardC.read(0,j));
+            else TwophaseC.write(0,j,0);
+        }
+    for(int i=0;i<m;++i){
+        for(int j=0;j<num;++j){
+            Twophase.write(i,j,Standard.read(i,j));
+        }
+    }
+    for(int i=0;i<m;++i){
+        Twophase.write(i,i+num,1);
+        for(int j=num;j<num+m;++j){
+            if(j!=num+i) Twophase.write(i,j,0);
+        }
+    }
+
+
+
+    //找出B、N、CBT(CB)、CNT(CT)、b、originalC列向量(最原始目标函数的系数矩阵)
+    _Matrix_Calc operate;
+    _Matrix N(m,num),B(m,m),CN(num,1),CB(m,1),originalC(num,1);
+    _Matrix BV(1,m),NBV(1,num);//保存BV、NBV的下标
+    for(int i=0;i<m;++i){
+        BV.write(0,i,num+1+i);
+    }
+    for(int i=0;i<num;++i){
+        NBV.write(0,i,i+1);
+    }
+    for(int i=0;i<m;++i){
+        for(int j=0;j<num;++j){
+            N.write(i,j,Standard.read(i,j));
+        }
+    }
+    for(int i=0;i<m;++i){
+        for(int j=0;j<m;++j){
+            if(i==j) B.write(i,j,1);
+            else B.write(i,j,0);
+        }
+    }
+    for(int i=0;i<num;++i){
+        CN.write(i,0,0);
+    }
+    for(int i=0;i<m;++i){
+        CB.write(i,0,-1);
+    }
+    operate.transpos(&StandardC,&originalC);
+    printf_matrix(&B);
+    cout<<endl;
+    printf_matrix(&N);
+    cout<<endl;
+    printf_matrix(&CB);
+    cout<<endl;
+    printf_matrix(&CN);
+    cout<<endl;
+    printf_matrix(&b);
+    cout<<endl;
+    printf_matrix(&NBV);
+    cout<<endl;
+    printf_matrix(&Twophase);
+    cout<<endl;
+    printf_matrix(&BV);
+    cout<<endl;
+    printf_matrix(&StandardC);
+    //B(2,2),BV(1,2),NBV(1,5),N(2,5),CB(2,1),CN(5,1),b(2,1),StandardC(5,1);
+    //NBV<=条件下NBV输出有问题
+
+    /*************************************/
+    //开始searching
+    _Matrix originalBV=BV;
+    _Matrix firstphaseRN(1,NBV.n),blandrules(1,BV.n);
+    firstphaseRN=get_chekingnumber(CN,CB,B,N);
+    float nameofentering,nameofleaving;
+    int j1,p1;//j为entering列数，p为leaving列数
+    while(!is_nomorethan0(firstphaseRN))
+    {
+        j1=find_entering(firstphaseRN,NBV,nameofentering);
+        blandrules=get_blandrules(B,b,N,j1);
+        printf_matrix(&blandrules);
+        if(is_unbounded(blandrules))
+            {
+                cout<<"sorry, the linear program is unbounded"<<endl;
+                return 0;
+            }
+        p1=find_leaving(blandrules,BV,nameofleaving);
+        changebvnbv(BV,NBV,j1,p1,nameofentering,nameofleaving);
+        changebncbcn(B,N,CB,CN,j1,p1);
+        firstphaseRN=get_chekingnumber(CN,CB,B,N);
+        cout<<"entering->x"<<nameofentering<<endl;
+        cout<<"leaving->x"<<nameofleaving<<endl;
+        printf_matrix(&firstphaseRN);
+    }
+    if(is_nofeasiblesolution(BV,originalBV))//initiaBV,originalBV对应名字不确定，都是twophase法人工变量的下标
+    {
+        cout<<"sorry,there is no feasible solution"<<endl;
+        return 0;
+    }
+    //进入第二段前改编N的一系列数据
+    _Matrix secondphaseCN((NBV.n-BV.n),1),secondphaseCB(BV.n,1),secondphaseN(N.m,(NBV.n-BV.n));
+    _Matrix secondphaseRN(1,NBV.n-B.m),secondphaseNBV(1,(NBV.n-BV.n));
+    secondphaseNBV=changesecondphaseNBV(NBV,BV,originalBV);
+    secondphaseCN=changesecondphaseCN(NBV,BV,originalBV,originalC);
+    secondphaseCB=changesecondphaseCB(BV,originalC);
+    secondphaseN=changesecondphaseN(NBV,BV,originalBV,N);
+    secondphaseRN=get_chekingnumber(secondphaseCN,secondphaseCB,B,secondphaseN);
+    //进入第二阶段phase2
+    cout<<"secondphase in progress"<<endl;
+    secondphaseRN=get_chekingnumber(secondphaseCN,secondphaseCB,B,secondphaseN);
+    cout<<"secondphaseNBV"<<endl;
+    printf_matrix(&secondphaseNBV);
+    cout<<"secondphaseN"<<endl;
+    printf_matrix(&secondphaseN);
+    cout<<"secondphaseCN"<<endl;
+    printf_matrix(&secondphaseCN);
+    cout<<"secondphaseCB"<<endl;
+    printf_matrix(&secondphaseCB);
+    cout<<"secondphaseRN"<<endl;
+    printf_matrix(&secondphaseRN);
+    while(!is_nomorethan0(secondphaseRN))
+    {
+        j1=find_entering(secondphaseRN,secondphaseNBV,nameofentering);
+        blandrules=get_blandrules(B,b,secondphaseN,j1);
+        if(is_unbounded(blandrules))
+            {
+                cout<<"sorry, the linear program is unbounded"<<endl;
+                return 0;
+            }
+        p1=find_leaving(blandrules,BV,nameofleaving);
+        changebvnbv(BV,secondphaseNBV,j1,p1,nameofentering,nameofleaving);
+        changebncbcn(B,secondphaseN,secondphaseCB,secondphaseCN,j1,p1);
+        secondphaseRN=get_chekingnumber(secondphaseCN,secondphaseCB,B,secondphaseN);
+        cout<<"entering->x"<<nameofentering<<endl;
+        cout<<"leaving->x"<<nameofleaving<<endl;
+    }
+    if(is_infinite(secondphaseRN))
+        {
+            cout<<"there is infinite solutions"<<endl;
+        }
+    printopt(secondphaseNBV,BV,b,B,secondphaseCB);
+    return 0;
+}
